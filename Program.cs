@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 const string AuthScheme = "cookie";
@@ -10,6 +11,16 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddAuthentication(AuthScheme)
     .AddCookie(AuthScheme)
     .AddCookie(AuthScheme2);
+
+builder.Services.AddAuthorization(builder =>
+{
+    builder.AddPolicy("eu_passport", policyBuilder =>
+    {
+        policyBuilder.RequireAuthenticatedUser()
+            .AddAuthenticationSchemes(AuthScheme)
+            .RequireClaim("passport_type", "eur");
+    });
+});
 
 var app = builder.Build();
 
@@ -59,7 +70,7 @@ app.MapGet("/sweden", (HttpContext context) =>
     // }
 
     return "allowed";
-});
+}).RequireAuthorization("eu_passport");
 
 app.MapGet("/norway", (HttpContext context) =>
 {
@@ -108,7 +119,7 @@ app.MapGet("/login", async (HttpContext context) =>
 
     await context.SignInAsync(AuthScheme, user);
     return "logged in";
-});
+}).AllowAnonymous();
 
 
 app.Run();
@@ -127,4 +138,17 @@ static bool HasEurClaim(HttpContext context)
 static bool HasNorClaim(HttpContext context)
 {
     return context.User.HasClaim("passport_type", "NOR");
+}
+
+public class MyRequirement : IAuthorizationRequirement
+{
+
+}
+
+public class MyRequirementHandler : AuthorizationHandler<MyRequirement>
+{
+    protected override Task HandleRequirementAsync(AuthorizationHandlerContext context, MyRequirement requirement)
+    {
+        return Task.CompletedTask;
+    }
 }
